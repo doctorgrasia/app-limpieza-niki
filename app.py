@@ -54,13 +54,14 @@ inversion_total = 5700.00
 @st.cache_resource
 def conectar_google():
     try:
-        # Aquí leemos la bóveda secreta
+        # AQUÍ ESTÁ EL CAMBIO: Ahora leemos de la bóveda (st.secrets)
         credenciales_dict = json.loads(st.secrets["google_credentials"])
         cuenta = gspread.service_account_from_dict(credenciales_dict)
         hoja = cuenta.open("Base_Datos_Niki")
         return hoja.sheet1
     except Exception as e:
-        st.error("⚠️ Error conectando a Google. Revisa tus secretos en Streamlit.")
+        # Esto nos dirá el error exacto si vuelve a fallar
+        st.error(f"⚠️ Error de conexión: {e}")
         st.stop()
 
 pestana = conectar_google()
