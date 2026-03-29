@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import gspread
+import json
 
 # 1. Configuración de la página y Estilo
 st.set_page_config(page_title="Finanzas App", page_icon="📱", layout="centered")
@@ -49,15 +50,17 @@ catalogo = {
 costos_fijos = 2000.00
 inversion_total = 5700.00 
 
-# --- CONEXIÓN MÁGICA A GOOGLE SHEETS ---
+# --- CONEXIÓN MÁGICA A GOOGLE SHEETS (AHORA DESDE LA NUBE) ---
 @st.cache_resource
 def conectar_google():
     try:
-        cuenta = gspread.service_account(filename="credenciales.json")
+        # Aquí leemos la bóveda secreta
+        credenciales_dict = json.loads(st.secrets["google_credentials"])
+        cuenta = gspread.service_account_from_dict(credenciales_dict)
         hoja = cuenta.open("Base_Datos_Niki")
         return hoja.sheet1
     except Exception as e:
-        st.error("⚠️ Error conectando a Google. Revisa que tu archivo se llame credenciales.json.")
+        st.error("⚠️ Error conectando a Google. Revisa tus secretos en Streamlit.")
         st.stop()
 
 pestana = conectar_google()
@@ -73,11 +76,9 @@ def guardar_datos_nube(df_a_guardar):
     lista_datos = [df_a_guardar.columns.values.tolist()] + df_a_guardar.values.tolist()
     pestana.update(lista_datos)
 
-# 3. LA "MEMORIA" DE TU APLICACIÓN
 if 'historial_ventas' not in st.session_state:
     st.session_state.historial_ventas = cargar_datos_nube()
 
-# --- MOTOR DE CÁLCULO ---
 df = st.session_state.historial_ventas.copy()
 ingresos_totales = 0.0
 ganancias_totales = 0.0
@@ -85,16 +86,12 @@ ganancias_totales = 0.0
 if not df.empty:
     df["Precio"] = df["Producto"].map(lambda x: catalogo[x]["precio"] if x in catalogo else 0)
     df["Costo"] = df["Producto"].map(lambda x: catalogo[x]["costo"] if x in catalogo else 0)
-
-    # Convertimos las columnas a números por si vienen como texto desde Google
     df["Litros"] = pd.to_numeric(df["Litros"], errors='coerce').fillna(0)
     df["Ingreso ($)"] = df["Litros"] * df["Precio"]
     df["Ganancia ($)"] = df["Litros"] * (df["Precio"] - df["Costo"])
-
     ingresos_totales = df["Ingreso ($)"].sum()
     ganancias_totales = df["Ganancia ($)"].sum()
 
-# 4. INTERFAZ VISUAL: MÉTRICAS
 st.title("📱 Mi Negocio - Productos de limpieza niki")
 
 st.subheader("Estadísticas Acumuladas")
@@ -108,21 +105,16 @@ with col3:
 
 st.divider()
 st.subheader("📊 Análisis y Salud del Negocio")
-
 st.write(f"**1. Meta Mensual (Costos Fijos: ${costos_fijos:,.2f})**")
 progreso_mes = ganancias_totales / costos_fijos if costos_fijos > 0 else 0
 st.progress(min(progreso_mes, 1.0))
-
 st.write(f"**2. Recuperación de Inversión (Total: ${inversion_total:,.2f})**")
 progreso_inversion = ganancias_totales / inversion_total if inversion_total > 0 else 0
 st.progress(min(progreso_inversion, 1.0))
 
-# 5. REGISTRO DE VENTAS
 st.divider()
 st.subheader("🛒 Registro de Ventas")
-
 fecha_venta = st.date_input("Fecha de la venta", datetime.date.today())
-
 col_prod, col_litros = st.columns(2)
 with col_prod:
     producto_seleccionado = st.selectbox("¿Qué vendiste?", list(catalogo.keys()))
@@ -130,7 +122,6 @@ with col_litros:
     litros = st.number_input("Litros vendidos", min_value=0.01, value=1.00, step=0.50, format="%.2f")
 
 if st.button("Registrar Venta"):
-    # Guardamos sin calcular ingresos aquí, el Motor de Cálculo lo hará en la siguiente recarga
     nueva_venta = pd.DataFrame([{
         "Fecha": fecha_venta.strftime("%d/%m/%Y"),
         "Producto": producto_seleccionado,
@@ -142,13 +133,10 @@ if st.button("Registrar Venta"):
     guardar_datos_nube(st.session_state.historial_ventas)
     st.rerun() 
 
-# 6. TABLA MÁGICA EDITABLE
 if not df.empty:
     st.divider()
     st.subheader("📋 Tu Agenda de Ventas")
-    
     columnas_mostrar = ["Fecha", "Producto", "Litros", "Ingreso ($)", "Ganancia ($)"]
-
     df_editado = st.data_editor(
         df[columnas_mostrar],
         column_config={
@@ -160,7 +148,6 @@ if not df.empty:
         num_rows="dynamic",
         use_container_width=True
     )
-
     df_base_editado = df_editado[["Fecha", "Producto", "Litros", "Ingreso ($)", "Ganancia ($)"]]
     if not df_base_editado.equals(st.session_state.historial_ventas):
         st.session_state.historial_ventas = df_base_editado
