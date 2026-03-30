@@ -171,8 +171,23 @@ st.divider()
 tab_ventas, tab_gastos = st.tabs(["🛒 Registrar Venta", "💸 Registrar Salida de Efectivo"])
 
 with tab_ventas:
-    # ... (Mismo código del formulario de ventas anterior) ...
-    pass # Simplificado para demo visual, mantén tu código de registro aquí
+    fecha_venta = st.date_input("Fecha de la venta", datetime.date.today(), key='fecha_venta_styled')
+    col_prod, col_litros = st.columns(2)
+    with col_prod: producto_seleccionado = st.selectbox("¿Qué vendiste?", list(catalogo.keys()), key='prod_styled')
+    with col_litros: litros = st.number_input("Litros vendidos", min_value=0.01, value=1.00, step=0.50, format="%.2f", key='litros_styled')
+
+    if st.button("Registrar Venta", type="primary", key='btn_venta_styled'):
+        nueva_venta = pd.DataFrame([{
+            "Fecha": fecha_venta.strftime("%d/%m/%Y"),
+            "Producto": producto_seleccionado,
+            "Litros": litros,
+            "Ingreso ($)": "",
+            "Ganancia ($)": ""
+        }])
+        st.session_state.historial_ventas = pd.concat([st.session_state.historial_ventas, nueva_venta], ignore_index=True)
+        guardar_datos(pestana_ventas, st.session_state.historial_ventas)
+        st.toast(f"✅ Venta de {producto_seleccionado} registrada correctamente.")
+        st.rerun() 
 
 with tab_gastos:
     st.markdown("Registra aquí compras de envases, pasajes, material u otros.")
@@ -182,12 +197,55 @@ with tab_gastos:
     with col_monto: monto_gasto = st.number_input("Monto gastado ($)", min_value=1.0, value=50.0, step=10.0, format="%.2f", key='monto_gasto_styled')
     with col_cat: categoria = st.selectbox("Categoría", ["Operativo", "Proveedor", "Servicio", "Pasajes", "Otro"], key='cat_styled')
 
-    # Fíjate en el type="primary" que ahora activará el estilo neón
     if st.button("Registrar Gasto", type="primary", key='btn_gasto_styled'):
-        # ... (Mismo código de guardar datos anterior) ...
-        # Agrega la lógica de guardado real de la versión anterior aquí
-        st.toast(f"💸 Gasto registrado.")
-        st.rerun()
+        if concepto.strip() == "":
+            st.warning("⚠️ Por favor escribe un concepto para el gasto.")
+        else:
+            nuevo_gasto = pd.DataFrame([{
+                "Fecha": fecha_gasto.strftime("%d/%m/%Y"),
+                "Concepto": concepto,
+                "Monto ($)": monto_gasto,
+                "Categoria": categoria
+            }])
+            st.session_state.historial_gastos = pd.concat([st.session_state.historial_gastos, nuevo_gasto], ignore_index=True)
+            guardar_datos(pestana_gastos, st.session_state.historial_gastos)
+            st.toast(f"💸 Gasto de ${monto_gasto} registrado exitosamente.")
+            st.rerun()
+
+# --- NUEVO MÓDULO: GRÁFICA DE PASTEL (PRODUCTOS MÁS VENDIDOS) ---
+st.divider()
+st.subheader("📊 Análisis Visual")
+
+if not df_ventas.empty:
+    # Agrupamos las ventas por producto y sumamos los litros
+    ventas_agrupadas = df_ventas.groupby("Producto")["Litros"].sum().reset_index()
+    # Ordenamos de mayor a menor
+    ventas_agrupadas = ventas_agrupadas.sort_values(by="Litros", ascending=False)
+
+    import plotly.express as px  # Importamos la librería que pusiste en requirements.txt
+    
+    # Creamos la gráfica de dona (hueca en el centro)
+    fig_ventas = px.pie(
+        ventas_agrupadas, 
+        names="Producto", 
+        values="Litros", 
+        hole=0.65, # El 65% del centro estará vacío, estilo Fintech
+        color_discrete_sequence=["#c8ff00", "#5bc8fa", "#6c63ff", "#ff6b6b", "#ff9f43"] # Colores del tema
+    )
+
+    # Ajustamos el diseño para que sea transparente y combine con el fondo oscuro
+    fig_ventas.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#ffffff", family="Inter"),
+        showlegend=True,
+        margin=dict(t=30, b=0, l=0, r=0)
+    )
+
+    # Mostramos la gráfica interactiva
+    st.plotly_chart(fig_ventas, use_container_width=True)
+else:
+    st.info("Registra algunas ventas para ver la gráfica de productos más vendidos.")
 
 # 5. TABLAS DE CONSULTA
 st.divider()
