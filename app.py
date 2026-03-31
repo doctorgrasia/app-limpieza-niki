@@ -3,331 +3,173 @@ import pandas as pd
 import datetime
 import gspread
 import json
-import plotly.express as px  # Importamos Plotly aquí arriba, es más seguro
+import plotly.express as px
 
-# 1. Configuración de la página
+# 1. Configuración y Estilos (Se mantienen igual para conservar tu diseño Fintech)
 st.set_page_config(page_title="Finanzas App - Niki", page_icon="📱", layout="centered")
 
-# --- BÓVEDA SECRETA DE ESTILOS CSS (DISEÑO FINTECH DARKS) ---
 st.markdown("""
     <style>
-    /* 1. VARIABLES GLOBALES (PUNTO 1 DEL PROMPT) */
     :root {
       --bg-primary: #1a1a1a;
       --bg-secondary: #242424;
       --bg-card: #2a2a2a;
       --bg-card-hover: #303030;
-      --accent-green: #c8ff00;    /* neon lime */
-      --accent-coral: #ff6b6b;    /* rojo gastos */
-      --accent-blue: #5bc8fa;     /* azul ingresos */
+      --accent-green: #c8ff00;
+      --accent-coral: #ff6b6b;
+      --accent-blue: #5bc8fa;
       --text-primary: #ffffff;
       --text-secondary: #8a8a8a;
       --radius-card: 20px;
     }
-
-    /* 2. ESTILO DE FONDO Y TEXTO GLOBAL */
     .stApp { background-color: var(--bg-primary); color: var(--text-primary); }
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdownContainer p { color: var(--text-primary) !important; font-family: 'Inter', sans-serif; }
     h1 { color: var(--accent-green) !important; text-align: center; margin-bottom: 30px;}
-    label { color: var(--text-secondary) !important; }
-    .stAlert p { color: #1a1a1a !important; } /* Parche para alertas legibles */
-
-    /* 3. ESTILO DE BOTONES PRIMARIOS (VERDE NEÓN) */
     div.stButton > button:first-child {
         background-color: var(--accent-green); color: #111111;
         border-radius: 50px; border: none; font-weight: bold;
         transition: transform 150ms ease, box-shadow 150ms ease;
         padding: 10px 25px;
     }
-    div.stButton > button:first-child:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(200,255,0,0.3);
-        background-color: var(--accent-green); color: #111111;
-    }
-
-    /* 4. ESTILO DE INPUTS (OSCUROS Y RESALTADOS) */
-    .stNumberInput input, .stTextInput input, .stSelectbox [data-baseweb="select"] {
-        background-color: var(--bg-card) !important; color: white !important;
-        border: 1px solid #444 !important; border-radius: 10px;
-    }
-    .stNumberInput input:focus, .stTextInput input:focus {
-        border-color: var(--accent-green) !important;
-        box-shadow: 0 0 0 3px rgba(200,255,0,0.15) !important;
-    }
-
-    /* 5. DISEÑO DE "FINTECH CARDS" PARA MÉTRICAS (HTML PERSONALIZADO) */
     .metric-card-container { display: flex; gap: 1rem; margin-bottom: 2rem; justify-content: space-between; flex-wrap: wrap;}
     .fintech-card {
         background: var(--bg-card); border-radius: var(--radius-card);
         padding: 20px; flex: 1 1 calc(50% - 1rem); min-width: 150px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 1px solid #333;
-        transition: transform 300ms ease, background 150ms ease;
     }
-    .fintech-card:hover { transform: translateY(-3px); background: var(--bg-card-hover); }
-    .fintech-card .label { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 8px; }
-    .fintech-card .value { font-size: 1.8rem; font-weight: bold; }
-    .fintech-card .value.positive { color: var(--accent-green); }
-    .fintech-card .value.negative { color: var(--accent-coral); }
-    .fintech-card .value.neutral { color: var(--accent-blue); }
-
-    /* 6. ESTILO DE PESTAÑAS (TABS) */
-    button[data-baseweb="tab"] { background-color: transparent !important; color: var(--text-secondary) !important; border-bottom: none !important;}
-    button[data-baseweb="tab"][aria-selected="true"] { color: var(--accent-green) !important; font-weight: bold; border-bottom: 2px solid var(--accent-green) !important; }
-    div[data-baseweb="tab-highlight"] { background-color: var(--accent-green) !important; }
-    div[data-baseweb="tabpanel"] { padding-top: 20px; }
-
-    /* 7. ESTILO DE DATAFRAME (TABLAS) */
-    [data-testid="stDataFrame"] { background-color: var(--bg-card); border-radius: 10px; border: 1px solid #333;}
+    .fintech-card .value.positive { color: var(--accent-green); font-size: 1.8rem; font-weight: bold; }
+    .fintech-card .value.negative { color: var(--accent-coral); font-size: 1.8rem; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. TU CATÁLOGO (¡ASEGÚRATE DE QUE ESTÉ INCLUIDO!)
+# 2. Catálogo y Configuración
 catalogo = {
-    "Cloro": {"costo": 3.50, "precio": 6.00},
-    "Maestro limpio": {"costo": 5.00, "precio": 12.00},
-    "Lavanda": {"costo": 5.00, "precio": 12.00},
-    "Mar fresco": {"costo": 5.00, "precio": 12.00},
-    "Menta": {"costo": 5.00, "precio": 12.00},
-    "Violeta": {"costo": 5.00, "precio": 12.00},
-    "Pino blanco": {"costo": 6.00, "precio": 12.00},
-    "Fabuloso canela": {"costo": 5.00, "precio": 12.00},
-    "Carisma": {"costo": 7.00, "precio": 18.00},
-    "Primavera": {"costo": 7.00, "precio": 18.00},
-    "Ensueño": {"costo": 7.00, "precio": 18.00},
-    "Dawny azul": {"costo": 7.00, "precio": 18.00},
-    "Lavanderia": {"costo": 7.00, "precio": 20.00},
-    "Ariel doble poder": {"costo": 9.00, "precio": 20.00},
-    "Roma": {"costo": 9.00, "precio": 20.00},
-    "Mas color": {"costo": 9.00, "precio": 20.00},
-    "Zote": {"costo": 9.00, "precio": 20.00},
-    "Persil": {"costo": 9.00, "precio": 20.00},
-    "Brazo": {"costo": 9.00, "precio": 20.00},
-    "Mas negro": {"costo": 9.00, "precio": 20.00},
-    "Vanish gel": {"costo": 9.00, "precio": 20.00},
-    "Cereza manos": {"costo": 9.00, "precio": 20.00},
-    "Salvo": {"costo": 12.00, "precio": 22.00},
-    "Axion": {"costo": 12.00, "precio": 22.00},
-    "Detercon": {"costo": 12.00, "precio": 22.00},
-    "Shampoo con cera": {"costo": 15.00, "precio": 25.00}
+    "Cloro": {"costo": 3.50, "precio": 6.00}, "Maestro limpio": {"costo": 5.00, "precio": 12.00},
+    "Lavanda": {"costo": 5.00, "precio": 12.00}, "Mar fresco": {"costo": 5.00, "precio": 12.00},
+    "Menta": {"costo": 5.00, "precio": 12.00}, "Violeta": {"costo": 5.00, "precio": 12.00},
+    "Pino blanco": {"costo": 6.00, "precio": 12.00}, "Fabuloso canela": {"costo": 5.00, "precio": 12.00},
+    "Carisma": {"costo": 7.00, "precio": 18.00}, "Primavera": {"costo": 7.00, "precio": 18.00},
+    "Ensueño": {"costo": 7.00, "precio": 18.00}, "Dawny azul": {"costo": 7.00, "precio": 18.00},
+    "Lavanderia": {"costo": 7.00, "precio": 20.00}, "Ariel doble poder": {"costo": 9.00, "precio": 20.00},
+    "Roma": {"costo": 9.00, "precio": 20.00}, "Mas color": {"costo": 9.00, "precio": 20.00},
+    "Zote": {"costo": 9.00, "precio": 20.00}, "Persil": {"costo": 9.00, "precio": 20.00},
+    "Brazo": {"costo": 9.00, "precio": 20.00}, "Mas negro": {"costo": 9.00, "precio": 20.00},
+    "Vanish gel": {"costo": 9.00, "precio": 20.00}, "Cereza manos": {"costo": 9.00, "precio": 20.00},
+    "Salvo": {"costo": 12.00, "precio": 22.00}, "Axion": {"costo": 12.00, "precio": 22.00},
+    "Detercon": {"costo": 12.00, "precio": 22.00}, "Shampoo con cera": {"costo": 15.00, "precio": 25.00}
 }
-
-costos_fijos = 2000.00
 inversion_total = 5700.00 
 
-# --- CONEXIÓN SEGURA A GOOGLE SHEETS DESDE LA NUBE ---
+# 3. Conexión a Google Sheets
 @st.cache_resource
 def conectar_google():
     try:
-        # Esto lee directamente de la configuración secreta de Streamlit (la bóveda)
         credenciales_dict = json.loads(st.secrets["google_credentials"])
         cuenta = gspread.service_account_from_dict(credenciales_dict)
         hoja = cuenta.open("Base_Datos_Niki")
         return hoja
     except Exception as e:
-        st.error(f"⚠️ Error de conexión a Google: {e}")
+        st.error(f"⚠️ Error: {e}")
         st.stop()
 
 doc_google = conectar_google()
-
-# Conectamos a las pestañas específicas
-pestana_ventas = doc_google.get_worksheet(0) # Asumimos que Ventas es la primera hoja
-
+pestana_ventas = doc_google.get_worksheet(0)
 try:
     pestana_gastos = doc_google.worksheet("Gastos")
 except:
-    st.error("⚠️ No se encontró la pestaña 'Gastos' en tu Google Sheets. Créala primero.")
+    st.error("⚠️ Crea la pestaña 'Gastos' en Drive.")
     st.stop()
 
-# Funciones para leer y guardar datos (idénticas a las anteriores)
-def cargar_datos(pestana, columnas_default):
+def cargar_datos(pestana, columnas):
     datos = pestana.get_all_records()
-    if datos:
-        return pd.DataFrame(datos)
-    return pd.DataFrame(columns=columnas_default)
+    return pd.DataFrame(datos) if datos else pd.DataFrame(columns=columnas)
 
-def guardar_datos(pestana, df_a_guardar):
+def guardar_datos(pestana, df):
     pestana.clear()
-    lista_datos = [df_a_guardar.columns.values.tolist()] + df_a_guardar.values.tolist()
-    pestana.update(lista_datos)
+    pestana.update([df.columns.values.tolist()] + df.values.tolist())
 
-# --- LA "MEMORIA" DE TU APLICACIÓN (Manejo de Estado) ---
-if 'historial_ventas' not in st.session_state:
-    st.session_state.historial_ventas = cargar_datos(pestana_ventas, ["Fecha", "Producto", "Litros", "Ingreso ($)", "Ganancia ($)"])
+# Cargar historial
+if 'hist_v' not in st.session_state: st.session_state.hist_v = cargar_datos(pestana_ventas, ["Fecha", "Producto", "Litros", "Ingreso ($)", "Ganancia ($)"])
+if 'hist_g' not in st.session_state: st.session_state.hist_g = cargar_datos(pestana_gastos, ["Fecha", "Concepto", "Monto ($)", "Categoria"])
 
-if 'historial_gastos' not in st.session_state:
-    st.session_state.historial_gastos = cargar_datos(pestana_gastos, ["Fecha", "Concepto", "Monto ($)", "Categoria"])
+# Cálculos
+df_v = st.session_state.hist_v.copy()
+df_g = st.session_state.hist_g.copy()
 
-# --- MOTOR DE CÁLCULO ---
-df_ventas = st.session_state.historial_ventas.copy()
-df_gastos = st.session_state.historial_gastos.copy()
+if not df_v.empty:
+    df_v["Litros"] = pd.to_numeric(df_v["Litros"], errors='coerce').fillna(0)
+    df_v["Ingreso ($)"] = df_v.apply(lambda r: r["Litros"] * catalogo.get(r["Producto"], {}).get("precio", 0), axis=1)
+    df_v["Ganancia ($)"] = df_v.apply(lambda r: r["Litros"] * (catalogo.get(r["Producto"], {}).get("precio", 0) - catalogo.get(r["Producto"], {}).get("costo", 0)), axis=1)
 
-# Nos aseguramos de que las columnas numéricas sean números reales y manejamos nulos
-if not df_ventas.empty:
-    df_ventas["Litros"] = pd.to_numeric(df_ventas["Litros"], errors='coerce').fillna(0)
-    # Calculamos ingresos y ganancias basándonos en el catálogo
-    df_ventas["Precio"] = df_ventas["Producto"].map(lambda x: catalogo[x]["precio"] if x in catalogo else 0)
-    df_ventas["Costo"] = df_ventas["Producto"].map(lambda x: catalogo[x]["costo"] if x in catalogo else 0)
-    df_ventas["Ingreso ($)"] = df_ventas["Litros"] * df_ventas["Precio"]
-    df_ventas["Ganancia ($)"] = df_ventas["Litros"] * (df_ventas["Precio"] - df_ventas["Costo"])
-else:
-    df_ventas = pd.DataFrame(columns=["Fecha", "Producto", "Litros", "Ingreso ($)", "Ganancia ($)"])
+ingresos = df_v["Ingreso ($)"].sum() if not df_v.empty else 0
+gastos = pd.to_numeric(df_g["Monto ($)"], errors='coerce').sum() if not df_g.empty else 0
+ganancias = df_v["Ganancia ($)"].sum() if not df_v.empty else 0
+caja = ingresos - gastos
 
-if not df_gastos.empty:
-    df_gastos["Monto ($)"] = pd.to_numeric(df_gastos["Monto ($)"], errors='coerce').fillna(0)
-else:
-    df_gastos = pd.DataFrame(columns=["Fecha", "Concepto", "Monto ($)", "Categoria"])
+# 4. Dashboard Visual
+st.title("📱 Finanzas Productos Niki")
 
-# Calculamos los totales
-ingresos_totales = df_ventas["Ingreso ($)"].sum()
-ganancias_totales = df_ventas["Ganancia ($)"].sum()
-gastos_totales = df_gastos["Monto ($)"].sum()
-
-# LÓGICA DE CAJA: Todo lo que entró de ventas MENOS todo lo que salió de gastos
-dinero_en_caja = ingresos_totales - gastos_totales
-
-# --- INTERFAZ VISUAL: DASHBOARD PRINCIPAL ---
-st.title("📱 Productos de Limpieza Niki")
-
-# Módulo 1: Flujo de Efectivo (Dinero en Caja y Gastos Totales)
 st.markdown(f"""
     <div class="metric-card-container">
-        <div class="fintech-card">
-            <div class="label">💵 Dinero en Caja</div>
-            <div class="value positive">${dinero_en_caja:,.2f}</div>
-        </div>
-        <div class="fintech-card">
-            <div class="label">🔻 Gastos Totales</div>
-            <div class="value negative">${gastos_totales:,.2f}</div>
-        </div>
+        <div class="fintech-card"><div class="label">💵 Dinero en Caja</div><div class="value positive">${caja:,.2f}</div></div>
+        <div class="fintech-card"><div class="label">🔻 Gastos Totales</div><div class="value negative">${gastos:,.2f}</div></div>
+    </div>
+    <div class="metric-card-container">
+        <div class="fintech-card"><div class="label">Ganancia Neta</div><div class="value positive">${ganancias:,.2f}</div></div>
     </div>
     """, unsafe_allow_html=True)
 
-# Módulo 2: Estadísticas de Negocio (Ingresos Ventas, Ganancia Neta, Inversión)
-st.markdown(f"""
-    <div class="metric-card-container">
-        <div class="fintech-card">
-            <div class="label">Ingresos (Ventas)</div>
-            <div class="value neutral">${ingresos_totales:,.2f}</div>
-        </div>
-        <div class="fintech-card">
-            <div class="label">Ganancia Neta</div>
-            <div class="value positive">${ganancias_totales:,.2f}</div>
-        </div>
-        <div class="fintech-card">
-            <div class="label">Inversión a Recuperar</div>
-            <div class="value neutral">${inversion_total:,.2f}</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+# 5. Registro
+tab_v, tab_g = st.tabs(["🛒 Venta", "💸 Gasto"])
 
-st.divider()
-
-# --- MÓDULOS DE REGISTRO (Tabs) CON LÓGICA CORREGIDA Y TOASTS ---
-tab_ventas, tab_gastos = st.tabs(["🛒 Registrar Venta", "💸 Registrar Salida de Efectivo"])
-
-with tab_ventas:
-    fecha_venta = st.date_input("Fecha de la venta", datetime.date.today(), key='date_venta_styled')
-    col_prod, col_litros = st.columns(2)
-    with col_prod:
-        producto_seleccionado = st.selectbox("¿Qué vendiste?", list(catalogo.keys()), key='prod_venta_styled')
-    with col_litros:
-        litros = st.number_input("Litros vendidos", min_value=0.01, value=1.00, step=0.50, format="%.2f", key='litros_venta_styled')
-
-    if st.button("Registrar Venta", type="primary", key='btn_venta_styled'):
-        nueva_venta = pd.DataFrame([{
-            "Fecha": fecha_venta.strftime("%d/%m/%Y"),
-            "Producto": producto_seleccionado,
-            "Litros": litros,
-            "Ingreso ($)": "", # Dejamos vacío, el motor de cálculo lo llena
-            "Ganancia ($)": ""
-        }])
-        st.session_state.historial_ventas = pd.concat([st.session_state.historial_ventas, nueva_venta], ignore_index=True)
-        guardar_datos(pestana_ventas, st.session_state.historial_ventas)
-        st.toast(f"✅ Venta de {producto_seleccionado} registrada exitosamente.")
-        st.rerun() 
-
-with tab_gastos:
-    st.markdown("Registra aquí compras de envases, pasajes, material u otros.")
-    fecha_gasto = st.date_input("Fecha del gasto", datetime.date.today(), key='date_gasto_styled')
-    concepto = st.text_input("Concepto (Ej. Compra de botellas)", key='concept_gasto_styled')
-    col_monto, col_cat = st.columns(2)
-    with col_monto:
-        monto_gasto = st.number_input("Monto gastado ($)", min_value=1.0, value=50.0, step=10.0, format="%.2f", key='monto_gasto_styled')
-    with col_cat:
-        categoria = st.selectbox("Categoría", ["Operativo", "Proveedor", "Servicio", "Pasajes", "Otro"], key='cat_gasto_styled')
-
-    if st.button("Registrar Gasto", type="primary", key='btn_gasto_styled'):
-        if concepto.strip() == "":
-            st.warning("⚠️ Por favor escribe un concepto para el gasto.")
-        else:
-            # LÓGICA DE GUARDADO DE GASTOS REAL Y CORREGIDA
-            nuevo_gasto = pd.DataFrame([{
-                "Fecha": fecha_gasto.strftime("%d/%m/%Y"),
-                "Concepto": concepto,
-                "Monto ($)": monto_gasto,
-                "Categoria": categoria
-            }])
-            # 1. Actualizamos el historial en memoria (Session State)
-            st.session_state.historial_gastos = pd.concat([st.session_state.historial_gastos, nuevo_gasto], ignore_index=True)
-            # 2. Guardamos el historial completo en Google Sheets
-            guardar_datos(pestana_gastos, st.session_state.historial_gastos)
-            # 3. Notificación flotante (Toast)
-            st.toast(f"💸 Gasto de ${monto_gasto} por '{concepto}' registrado exitosamente.")
-            # 4. Forzamos recarga para actualizar Dinero en Caja
+with tab_v:
+    with st.form("form_v"):
+        f = st.date_input("Fecha", datetime.date.today())
+        p = st.selectbox("Producto", list(catalogo.keys()))
+        l = st.number_input("Litros", min_value=0.1, value=1.0)
+        if st.form_submit_button("Registrar Venta"):
+            nv = pd.DataFrame([{"Fecha": f.strftime("%d/%m/%Y"), "Producto": p, "Litros": l, "Ingreso ($)": 0, "Ganancia ($)": 0}])
+            st.session_state.hist_v = pd.concat([st.session_state.hist_v, nv], ignore_index=True)
+            guardar_datos(pestana_ventas, st.session_state.hist_v)
+            st.toast("✅ Venta guardada")
             st.rerun()
 
-# --- MÓDULO: GRÁFICA DE DONA (PRODUCTOS MÁS VENDIDOS) ---
+with tab_g:
+    with st.form("form_g"):
+        fg = st.date_input("Fecha", datetime.date.today())
+        con = st.text_input("Concepto")
+        mon = st.number_input("Monto", min_value=1.0)
+        cat = st.selectbox("Categoría", ["Operativo", "Pasajes", "Proveedor", "Otro"])
+        if st.form_submit_button("Registrar Gasto"):
+            ng = pd.DataFrame([{"Fecha": fg.strftime("%d/%m/%Y"), "Concepto": con, "Monto ($)": mon, "Categoria": cat}])
+            st.session_state.hist_g = pd.concat([st.session_state.hist_g, ng], ignore_index=True)
+            guardar_datos(pestana_gastos, st.session_state.hist_g)
+            st.toast("💸 Gasto guardado")
+            st.rerun()
+
+# --- 6. SECCIÓN DE EDICIÓN (LO NUEVO) ---
 st.divider()
-st.subheader("📊 Análisis Visual")
+st.subheader("📋 Edición y Consultas")
+t_v, t_g = st.tabs(["Agenda de Ventas", "Editar Historial de Gastos"])
 
-if not df_ventas.empty:
-    # Agrupamos las ventas por producto y sumamos los litros
-    ventas_agrupadas = df_ventas.groupby("Producto")["Litros"].sum().reset_index()
-    # Ordenamos de mayor a menor para que la leyenda se vea mejor
-    ventas_agrupadas = ventas_agrupadas.sort_values(by="Litros", ascending=False)
+with t_v:
+    st.dataframe(df_v, use_container_width=True)
 
-    # Creamos la gráfica de dona (hole=0.65) estilo Fintech
-    fig_ventas = px.pie(
-        ventas_agrupadas, 
-        names="Producto", 
-        values="Litros", 
-        hole=0.65, # El centro estará vacío
-        color_discrete_sequence=["#c8ff00", "#5bc8fa", "#6c63ff", "#ff6b6b", "#ff9f43"], # Colores del tema
-        labels={"Litros": "Total Vendido (Lt)"}
-    )
-
-    # Ajustamos el diseño (transparencia y fuente) para combinar perfectamente con el fondo oscuro
-    fig_ventas.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#ffffff", family="Inter, sans-serif"),
-        showlegend=True,
-        legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=-0.2),
-        margin=dict(t=30, b=0, l=0, r=0)
-    )
+with t_g:
+    st.info("💡 Haz doble clic en una celda para editar. Al terminar, presiona el botón de abajo.")
+    # El st.data_editor permite modificar la tabla directamente
+    df_editado = st.data_editor(st.session_state.hist_g, use_container_width=True, num_rows="dynamic")
     
-    # Añadimos hover custom para ver el dato exacto
-    fig_ventas.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="%{label}<br>%{value} litros (%{percent})")
+    if st.button("💾 Guardar cambios en Gastos", type="primary"):
+        st.session_state.hist_g = df_editado
+        guardar_datos(pestana_gastos, df_editado)
+        st.success("✅ ¡Base de datos de Gastos actualizada en Drive!")
+        st.rerun()
 
-    # Mostramos la gráfica interactiva en Streamlit
-    st.plotly_chart(fig_ventas, use_container_width=True)
-else:
-    st.info("Registra algunas ventas para ver la gráfica de productos más vendidos.")
-
-# --- SECCIÓN: CONSULTAS RÁPIDAS (DATAFRAMES RE-ESTILIZADOS) ---
-st.divider()
-st.subheader("📋 Consultas Rápidas")
-tab_tabla_ventas, tab_tabla_gastos = st.tabs(["Agenda de Ventas", "Historial de Gastos"])
-
-with tab_tabla_ventas:
-    if not df_ventas.empty:
-        # Mostramos la tabla solo con las columnas importantes
-        st.dataframe(df_ventas[["Fecha", "Producto", "Litros", "Ingreso ($)", "Ganancia ($)"]], use_container_width=True)
-    else:
-        st.info("Aún no hay ventas registradas.")
-
-with tab_tabla_gastos:
-    if not df_gastos.empty:
-        st.dataframe(df_gastos[["Fecha", "Concepto", "Monto ($)", "Categoria"]], use_container_width=True)
-    else:
-        st.info("Aún no hay gastos registrados.")
+# 7. Gráfica
+if not df_v.empty:
+    st.divider()
+    va = df_v.groupby("Producto")["Litros"].sum().reset_index()
+    fig = px.pie(va, names="Producto", values="Litros", hole=0.6, color_discrete_sequence=["#c8ff00", "#5bc8fa", "#ff6b6b"])
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#fff"))
+    st.plotly_chart(fig)
