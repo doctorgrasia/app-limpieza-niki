@@ -86,7 +86,12 @@ def cargar_datos(pestana, columnas):
 
 def guardar_datos(pestana, df):
     pestana.clear()
-    pestana.update([df.columns.values.tolist()] + df.values.tolist())
+    # LIMPIEZA DE DATOS: Reemplazamos los NaN o nulos por un texto vacío ""
+    # Esto evita el InvalidJSONError al mandar los datos a Google
+    df_limpio = df.fillna("") 
+    
+    # Ahora enviamos df_limpio en lugar del df original
+    pestana.update([df_limpio.columns.values.tolist()] + df_limpio.values.tolist())
 
 # Cargar historial
 if 'hist_v' not in st.session_state: st.session_state.hist_v = cargar_datos(pestana_ventas, ["Fecha", "Producto", "Litros", "Ingreso ($)", "Ganancia ($)"])
