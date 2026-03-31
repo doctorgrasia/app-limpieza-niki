@@ -127,16 +127,33 @@ st.markdown(f"""
 # 5. Registro
 tab_v, tab_g = st.tabs(["🛒 Venta", "💸 Gasto"])
 
-with tab_v:
-    with st.form("form_v"):
-        f = st.date_input("Fecha", datetime.date.today())
-        p = st.selectbox("Producto", list(catalogo.keys()))
-        l = st.number_input("Litros", min_value=0.1, value=1.0)
+with st.form("venta"):
+        prod = st.selectbox("Producto", list(catalogo.keys()))
+        lits = st.number_input("Litros", min_value=0.1, value=1.0)
+        
         if st.form_submit_button("Registrar Venta"):
-            nv = pd.DataFrame([{"Fecha": f.strftime("%d/%m/%Y"), "Producto": p, "Litros": l, "Ingreso ($)": 0, "Ganancia ($)": 0}])
-            st.session_state.hist_v = pd.concat([st.session_state.hist_v, nv], ignore_index=True)
-            guardar_datos(pestana_ventas, st.session_state.hist_v)
-            st.toast("✅ Venta guardada")
+            # 1. Calculamos la matemática ANTES de guardar
+            precio_unitario = catalogo[prod]["precio"]
+            costo_unitario = catalogo[prod]["costo"]
+            ingreso_real = lits * precio_unitario
+            ganancia_real = lits * (precio_unitario - costo_unitario)
+
+            # 2. Empaquetamos los datos reales, no ceros
+            nv = pd.DataFrame([{
+                "Fecha": datetime.date.today().strftime("%d/%m/%Y"), 
+                "Producto": prod, 
+                "Litros": lits,
+                "Ingreso ($)": ingreso_real,    # <-- Aquí está la magia
+                "Ganancia ($)": ganancia_real   # <-- Aquí está la magia
+            }])
+            
+            st.session_state.v = pd.concat([st.session_state.v, nv], ignore_index=True)
+            guardar(sh_v, st.session_state.v)
+            
+            # (Si ya implementaste el inventario del paso anterior, deja esta línea)
+            descontar_inventario(prod, lits) 
+            
+            st.toast(f"✅ Vendido {lits}L de {prod}")
             st.rerun()
 
 with tab_g:
