@@ -123,6 +123,9 @@ tab_v, tab_g, tab_i, tab_c = st.tabs(["🛒 Venta", "💸 Gasto", "📦 Inventar
 # TAB: VENTAS
 with tab_v:
     with st.form("form_venta"):
+        # --- SOLUCIÓN: AQUÍ ESTÁ EL CALENDARIO ---
+        fecha_venta = st.date_input("📅 Fecha de Venta", datetime.date.today())
+        
         prod = st.selectbox("Producto", list(catalogo.keys()))
         lits = st.number_input("Litros", min_value=0.1, value=1.0, step=0.5)
         
@@ -133,7 +136,8 @@ with tab_v:
             ganancia_real = float(lits) * (float(precio_unitario) - float(costo_unitario))
 
             nv = pd.DataFrame([{
-                "Fecha": datetime.date.today().strftime("%d/%m/%Y"), 
+                # --- SOLUCIÓN: CONECTAMOS LA FECHA ELEGIDA EN LUGAR DE LA FECHA DE HOY ---
+                "Fecha": fecha_venta.strftime("%d/%m/%Y"), 
                 "Producto": prod, 
                 "Litros": float(lits),
                 "Ingreso ($)": ingreso_real,
