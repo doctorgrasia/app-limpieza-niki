@@ -48,9 +48,10 @@ catalogo = {
     "Brazo": {"costo": 9.00, "precio": 20.00}, "Mas negro": {"costo": 9.00, "precio": 20.00},
     "Vanish gel": {"costo": 9.00, "precio": 20.00}, "Cereza manos": {"costo": 9.00, "precio": 20.00},
     "Salvo": {"costo": 12.00, "precio": 22.00}, "Axion": {"costo": 12.00, "precio": 22.00},
-    "Detercon": {"costo": 12.00, "precio": 22.00}, "Shampoo con cera": {"costo": 15.00, "precio": 25.00}
+    "Detercon": {"costo": 12.00, "precio": 22.00}, "Shampoo con cera": {"costo": 15.00, "precio": 25.00},
+    "Ahuyenta perros": {"costo": 8.00, "precio": 16.00}
 }
-inversion_total = 5700.00 
+inversion_total = 5700.00
 
 # --- 3. CONEXIÓN A GOOGLE SHEETS ---
 @st.cache_resource
